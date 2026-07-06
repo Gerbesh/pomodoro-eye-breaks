@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover
 
 
 APP_NAME = "Focus Breaks"
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.1.3"
 
 
 def resource_path(relative_path):
@@ -60,7 +60,6 @@ TRANSLATIONS = {
     "ru": {
         "window_title": "Помидоро-перерывы",
         "title": "Фокус и зрение",
-        "subtitle": "20 минут работы, 5 минут перерыва. Когда пора отдохнуть, приложение затемняет весь экран.",
         "status_focus_running": "Фокус идет",
         "status_focus_ready": "Готов к фокусу",
         "status_break_running": "Перерыв",
@@ -80,10 +79,7 @@ TRANSLATIONS = {
         "break_minutes": "Перерыв, минут",
         "sound": "Звуковой сигнал",
         "auto_start": "Автоматически начинать следующий фокус",
-        "note": (
-            "Во время перерыва лучше встать, размять плечи и посмотреть вдаль. "
-            "Для 12-часового дня это не роскошь, а техобслуживание человека."
-        ),
+        "note": "Во время перерыва лучше встать, размять плечи и посмотреть вдаль.",
         "overlay_title_default": "ОТДОХНИ 5 МИНУТ",
         "overlay_title": "ОТДОХНИ {minutes} МИН.",
         "overlay_hint": "Посмотри вдаль, расслабь глаза, встань из-за стола.",
@@ -93,7 +89,6 @@ TRANSLATIONS = {
     "en": {
         "window_title": "Focus Breaks",
         "title": "Focus and Eyes",
-        "subtitle": "20 minutes of focus, 5 minutes of rest. When it is time to pause, the app dims the whole screen.",
         "status_focus_running": "Focus running",
         "status_focus_ready": "Ready to focus",
         "status_break_running": "Break time",
@@ -113,10 +108,7 @@ TRANSLATIONS = {
         "break_minutes": "Break, minutes",
         "sound": "Sound alert",
         "auto_start": "Automatically start next focus session",
-        "note": (
-            "During a break, stand up, loosen your shoulders, and look into the distance. "
-            "For a 12-hour day, this is human maintenance, not a luxury."
-        ),
+        "note": "During a break, stand up, loosen your shoulders, and look into the distance.",
         "overlay_title_default": "REST FOR 5 MINUTES",
         "overlay_title": "REST FOR {minutes} MIN.",
         "overlay_hint": "Look into the distance, relax your eyes, stand up from the desk.",
@@ -385,12 +377,6 @@ class MainWindow(QMainWindow):
         set_font(self.title_label, 26, QFont.DemiBold)
         shell.addWidget(self.title_label)
 
-        self.subtitle_label = QLabel()
-        self.subtitle_label.setWordWrap(True)
-        self.subtitle_label.setObjectName("muted")
-        set_font(self.subtitle_label, 10)
-        shell.addWidget(self.subtitle_label)
-
         timer_card = self.card()
         timer_card.setMinimumHeight(386)
         timer_layout = QVBoxLayout(timer_card)
@@ -604,7 +590,6 @@ class MainWindow(QMainWindow):
     def apply_language(self):
         self.setWindowTitle(self.t("window_title"))
         self.title_label.setText(self.t("title"))
-        self.subtitle_label.setText(self.t("subtitle"))
         self.settings_title.setText(self.t("settings"))
         self.setting_labels["language"].setText(self.t("language"))
         self.setting_labels["focus_minutes"].setText(self.t("focus_minutes"))
