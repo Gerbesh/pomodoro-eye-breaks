@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Local config and build outputs
+settings.json
+build/
+dist/
+release/
+*.spec
+
+# Editor/OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
