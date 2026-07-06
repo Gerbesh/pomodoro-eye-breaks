@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover
 
 
 APP_NAME = "Focus Breaks"
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.2"
 
 
 def resource_path(relative_path):
@@ -195,7 +195,8 @@ class CircleTimer(QWidget):
         self.duration = 20 * 60
         self.mode = "focus"
         self.language = "en"
-        self.setMinimumSize(QSize(300, 300))
+        self.setMinimumSize(QSize(250, 250))
+        self.setMaximumHeight(280)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def set_state(self, remaining, duration, mode, language=None):
@@ -212,7 +213,7 @@ class CircleTimer(QWidget):
 
         width = self.width()
         height = self.height()
-        size = min(width, height) - 44
+        size = max(180, min(width, height) - 42)
         left = (width - size) / 2
         top = (height - size) / 2
         rect = QRect(int(left), int(top), int(size), int(size))
@@ -226,15 +227,15 @@ class CircleTimer(QWidget):
         painter.drawArc(rect, 90 * 16, int(-360 * 16 * progress))
 
         painter.setPen(QColor(COLORS["text"]))
-        timer_font = QFont("Segoe UI", 48, QFont.DemiBold)
+        timer_font = QFont("Segoe UI", 44, QFont.DemiBold)
         painter.setFont(timer_font)
-        painter.drawText(rect.adjusted(0, -18, 0, 0), Qt.AlignCenter, format_seconds(self.remaining))
+        painter.drawText(rect.adjusted(0, -16, 0, 0), Qt.AlignCenter, format_seconds(self.remaining))
 
         painter.setPen(QColor(COLORS["muted"]))
         sub_font = QFont("Segoe UI", 12)
         painter.setFont(sub_font)
         label = translate(self.language, "until_break" if self.mode == "focus" else "until_focus")
-        painter.drawText(rect.adjusted(0, 68, 0, 0), Qt.AlignCenter, label)
+        painter.drawText(rect.adjusted(0, 62, 0, 0), Qt.AlignCenter, label)
 
 
 class BreakOverlay(QWidget):
@@ -348,8 +349,8 @@ class MainWindow(QMainWindow):
         self.overlays = []
         self.language = self.settings["language"]
 
-        self.setMinimumSize(560, 680)
-        self.resize(620, 720)
+        self.setMinimumSize(640, 880)
+        self.resize(700, 900)
         if ICON_PATH.exists():
             self.setWindowIcon(QIcon(str(ICON_PATH)))
 
@@ -377,8 +378,8 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(self.stylesheet())
 
         shell = QVBoxLayout(root)
-        shell.setContentsMargins(30, 28, 30, 28)
-        shell.setSpacing(18)
+        shell.setContentsMargins(30, 26, 30, 26)
+        shell.setSpacing(16)
 
         self.title_label = QLabel()
         set_font(self.title_label, 26, QFont.DemiBold)
@@ -391,10 +392,11 @@ class MainWindow(QMainWindow):
         shell.addWidget(self.subtitle_label)
 
         timer_card = self.card()
+        timer_card.setMinimumHeight(386)
         timer_layout = QVBoxLayout(timer_card)
-        timer_layout.setContentsMargins(24, 22, 24, 24)
-        timer_layout.setSpacing(14)
-        shell.addWidget(timer_card, 1)
+        timer_layout.setContentsMargins(24, 20, 24, 22)
+        timer_layout.setSpacing(10)
+        shell.addWidget(timer_card)
 
         self.status_label = QLabel()
         self.status_label.setAlignment(Qt.AlignCenter)
@@ -407,6 +409,8 @@ class MainWindow(QMainWindow):
 
         self.phase_label = QLabel()
         self.phase_label.setAlignment(Qt.AlignCenter)
+        self.phase_label.setWordWrap(True)
+        self.phase_label.setMinimumHeight(24)
         set_font(self.phase_label, 14, QFont.DemiBold)
         timer_layout.addWidget(self.phase_label)
 
@@ -429,10 +433,13 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.skip_button)
 
         settings_card = self.card()
+        settings_card.setMinimumHeight(196)
         settings_layout = QGridLayout(settings_card)
         settings_layout.setContentsMargins(20, 18, 20, 18)
         settings_layout.setHorizontalSpacing(18)
-        settings_layout.setVerticalSpacing(12)
+        settings_layout.setVerticalSpacing(10)
+        settings_layout.setColumnStretch(0, 1)
+        settings_layout.setColumnMinimumWidth(1, 190)
         shell.addWidget(settings_card)
 
         self.settings_title = QLabel()
@@ -444,6 +451,7 @@ class MainWindow(QMainWindow):
         self.language_combo = QComboBox()
         self.language_combo.addItem("Русский", "ru")
         self.language_combo.addItem("English", "en")
+        self.language_combo.setFixedWidth(190)
         self.language_combo.setCurrentIndex(0 if self.language == "ru" else 1)
         self.language_combo.currentIndexChanged.connect(self.on_language_changed)
 
@@ -527,8 +535,8 @@ class MainWindow(QMainWindow):
             color: {COLORS["text"]};
             border: 1px solid {COLORS["line"]};
             border-radius: 10px;
-            padding: 8px 10px;
-            min-width: 86px;
+            padding: 8px 12px;
+            min-width: 166px;
             font: 10pt "Segoe UI";
         }}
         QComboBox {{
@@ -536,9 +544,13 @@ class MainWindow(QMainWindow):
             color: {COLORS["text"]};
             border: 1px solid {COLORS["line"]};
             border-radius: 10px;
-            padding: 8px 10px;
-            min-width: 126px;
+            padding: 8px 12px;
+            min-width: 166px;
             font: 10pt "Segoe UI";
+        }}
+        QComboBox::drop-down {{
+            border: 0;
+            width: 30px;
         }}
         QComboBox QAbstractItemView {{
             background: {COLORS["panel2"]};
@@ -573,6 +585,8 @@ class MainWindow(QMainWindow):
         spin = QSpinBox()
         spin.setRange(low, high)
         spin.setValue(value)
+        spin.setButtonSymbols(QSpinBox.NoButtons)
+        spin.setFixedWidth(190)
         spin.valueChanged.connect(self.on_duration_changed)
         return spin
 
