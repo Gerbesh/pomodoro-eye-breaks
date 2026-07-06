@@ -11,6 +11,7 @@ The app is intentionally simple: start, pause, reset, skip the current phase, an
 - 20/5 focus and break cycle by default
 - Full-screen break overlay on every monitor
 - Configurable focus and break durations
+- Russian and English UI with automatic first-run language selection
 - Pause, reset, and skip controls
 - Optional sound signal
 - Settings saved in `%APPDATA%\FocusBreaks\settings.json`

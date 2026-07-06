@@ -5,11 +5,12 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSize, Qt, QTimer
+from PySide6.QtCore import QLocale, QRect, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -29,7 +30,7 @@ except ImportError:  # pragma: no cover
 
 
 APP_NAME = "Focus Breaks"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 
 
 def resource_path(relative_path):
@@ -54,6 +55,84 @@ DEFAULT_SETTINGS = {
     "sound": True,
     "auto_start_next_focus": True,
 }
+
+TRANSLATIONS = {
+    "ru": {
+        "window_title": "Помидоро-перерывы",
+        "title": "Фокус и зрение",
+        "subtitle": "20 минут работы, 5 минут перерыва. Когда пора отдохнуть, приложение затемняет весь экран.",
+        "status_focus_running": "Фокус идет",
+        "status_focus_ready": "Готов к фокусу",
+        "status_break_running": "Перерыв",
+        "status_break_paused": "Перерыв на паузе",
+        "phase_next_break": "Следующий перерыв: {minutes} минут",
+        "phase_break": "Отдохни, посмотри вдаль, не проверяй уведомления",
+        "until_break": "до перерыва",
+        "until_focus": "до фокуса",
+        "start": "Старт",
+        "pause": "Пауза",
+        "continue": "Продолжить",
+        "reset": "Сброс",
+        "skip": "Пропустить",
+        "settings": "Настройки",
+        "language": "Язык",
+        "focus_minutes": "Работа, минут",
+        "break_minutes": "Перерыв, минут",
+        "sound": "Звуковой сигнал",
+        "auto_start": "Автоматически начинать следующий фокус",
+        "note": (
+            "Во время перерыва лучше встать, размять плечи и посмотреть вдаль. "
+            "Для 12-часового дня это не роскошь, а техобслуживание человека."
+        ),
+        "overlay_title_default": "ОТДОХНИ 5 МИНУТ",
+        "overlay_title": "ОТДОХНИ {minutes} МИН.",
+        "overlay_hint": "Посмотри вдаль, расслабь глаза, встань из-за стола.",
+        "overlay_shortcut": "Esc - пауза    Space - завершить перерыв",
+        "overlay_finish": "Завершить перерыв",
+    },
+    "en": {
+        "window_title": "Focus Breaks",
+        "title": "Focus and Eyes",
+        "subtitle": "20 minutes of focus, 5 minutes of rest. When it is time to pause, the app dims the whole screen.",
+        "status_focus_running": "Focus running",
+        "status_focus_ready": "Ready to focus",
+        "status_break_running": "Break time",
+        "status_break_paused": "Break paused",
+        "phase_next_break": "Next break: {minutes} minutes",
+        "phase_break": "Rest your eyes, look into the distance, skip notifications",
+        "until_break": "until break",
+        "until_focus": "until focus",
+        "start": "Start",
+        "pause": "Pause",
+        "continue": "Continue",
+        "reset": "Reset",
+        "skip": "Skip",
+        "settings": "Settings",
+        "language": "Language",
+        "focus_minutes": "Focus, minutes",
+        "break_minutes": "Break, minutes",
+        "sound": "Sound alert",
+        "auto_start": "Automatically start next focus session",
+        "note": (
+            "During a break, stand up, loosen your shoulders, and look into the distance. "
+            "For a 12-hour day, this is human maintenance, not a luxury."
+        ),
+        "overlay_title_default": "REST FOR 5 MINUTES",
+        "overlay_title": "REST FOR {minutes} MIN.",
+        "overlay_hint": "Look into the distance, relax your eyes, stand up from the desk.",
+        "overlay_shortcut": "Esc - pause    Space - end break",
+        "overlay_finish": "End break",
+    },
+}
+
+
+def system_language():
+    return "ru" if QLocale.system().name().lower().startswith("ru") else "en"
+
+
+def translate(language, key, **kwargs):
+    value = TRANSLATIONS.get(language, TRANSLATIONS["en"])[key]
+    return value.format(**kwargs) if kwargs else value
 
 COLORS = {
     "bg": "#0f1115",
@@ -91,6 +170,8 @@ def load_settings():
     settings["break_minutes"] = int(clamp(int(settings["break_minutes"]), 1, 60))
     settings["sound"] = bool(settings["sound"])
     settings["auto_start_next_focus"] = bool(settings["auto_start_next_focus"])
+    language = data.get("language", system_language())
+    settings["language"] = language if language in TRANSLATIONS else system_language()
     return settings
 
 
@@ -113,13 +194,16 @@ class CircleTimer(QWidget):
         self.remaining = 20 * 60
         self.duration = 20 * 60
         self.mode = "focus"
+        self.language = "en"
         self.setMinimumSize(QSize(300, 300))
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-    def set_state(self, remaining, duration, mode):
+    def set_state(self, remaining, duration, mode, language=None):
         self.remaining = remaining
         self.duration = max(1, duration)
         self.mode = mode
+        if language:
+            self.language = language
         self.update()
 
     def paintEvent(self, _event):
@@ -149,17 +233,18 @@ class CircleTimer(QWidget):
         painter.setPen(QColor(COLORS["muted"]))
         sub_font = QFont("Segoe UI", 12)
         painter.setFont(sub_font)
-        label = "до перерыва" if self.mode == "focus" else "до фокуса"
+        label = translate(self.language, "until_break" if self.mode == "focus" else "until_focus")
         painter.drawText(rect.adjusted(0, 68, 0, 0), Qt.AlignCenter, label)
 
 
 class BreakOverlay(QWidget):
-    def __init__(self, geometry, finish_callback, pause_callback):
+    def __init__(self, geometry, finish_callback, pause_callback, language):
         super().__init__(None)
         self.remaining = 5 * 60
         self.duration = 5 * 60
         self.finish_callback = finish_callback
         self.pause_callback = pause_callback
+        self.language = language
 
         self.setWindowFlags(
             Qt.FramelessWindowHint
@@ -195,12 +280,12 @@ class BreakOverlay(QWidget):
         layout.setContentsMargins(48, 48, 48, 48)
         layout.addStretch(1)
 
-        self.title = QLabel("ОТДОХНИ 5 МИНУТ")
+        self.title = QLabel()
         self.title.setAlignment(Qt.AlignCenter)
         set_font(self.title, 34, QFont.DemiBold)
         layout.addWidget(self.title)
 
-        self.hint = QLabel("Посмотри вдаль, расслабь глаза, встань из-за стола.")
+        self.hint = QLabel()
         self.hint.setAlignment(Qt.AlignCenter)
         self.hint.setStyleSheet(f"color: {COLORS['muted']};")
         set_font(self.hint, 15)
@@ -211,26 +296,35 @@ class BreakOverlay(QWidget):
         self.circle.setMaximumSize(QSize(520, 520))
         layout.addWidget(self.circle, alignment=Qt.AlignCenter)
 
-        self.shortcut = QLabel("Esc - пауза    Space - завершить перерыв")
+        self.shortcut = QLabel()
         self.shortcut.setAlignment(Qt.AlignCenter)
         self.shortcut.setStyleSheet("color: #697583;")
         set_font(self.shortcut, 10)
         layout.addWidget(self.shortcut)
 
-        self.finish_button = QPushButton("Завершить перерыв")
+        self.finish_button = QPushButton()
         self.finish_button.clicked.connect(self.finish_callback)
         layout.addWidget(self.finish_button, alignment=Qt.AlignCenter)
 
         layout.addStretch(1)
+        self.apply_language()
 
-    def update_timer(self, remaining, duration, break_minutes):
+    def apply_language(self):
+        self.hint.setText(translate(self.language, "overlay_hint"))
+        self.shortcut.setText(translate(self.language, "overlay_shortcut"))
+        self.finish_button.setText(translate(self.language, "overlay_finish"))
+
+    def update_timer(self, remaining, duration, break_minutes, language):
         self.remaining = remaining
         self.duration = max(1, duration)
+        if language != self.language:
+            self.language = language
+            self.apply_language()
         if break_minutes == 5:
-            self.title.setText("ОТДОХНИ 5 МИНУТ")
+            self.title.setText(translate(self.language, "overlay_title_default"))
         else:
-            self.title.setText(f"ОТДОХНИ {break_minutes} МИН.")
-        self.circle.set_state(remaining, duration, "break")
+            self.title.setText(translate(self.language, "overlay_title", minutes=break_minutes))
+        self.circle.set_state(remaining, duration, "break", self.language)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
@@ -252,8 +346,8 @@ class MainWindow(QMainWindow):
         self.deadline = None
         self.remaining = self.settings["focus_minutes"] * 60
         self.overlays = []
+        self.language = self.settings["language"]
 
-        self.setWindowTitle("Помидоро-перерывы")
         self.setMinimumSize(560, 680)
         self.resize(620, 720)
         if ICON_PATH.exists():
@@ -264,6 +358,7 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.tick)
 
         self.build_ui()
+        self.apply_language()
         self.refresh()
         self.timer.start()
 
@@ -285,17 +380,15 @@ class MainWindow(QMainWindow):
         shell.setContentsMargins(30, 28, 30, 28)
         shell.setSpacing(18)
 
-        title = QLabel("Фокус и зрение")
-        set_font(title, 26, QFont.DemiBold)
-        shell.addWidget(title)
+        self.title_label = QLabel()
+        set_font(self.title_label, 26, QFont.DemiBold)
+        shell.addWidget(self.title_label)
 
-        subtitle = QLabel(
-            "20 минут работы, 5 минут перерыва. Когда пора отдохнуть, приложение затемняет весь экран."
-        )
-        subtitle.setWordWrap(True)
-        subtitle.setObjectName("muted")
-        set_font(subtitle, 10)
-        shell.addWidget(subtitle)
+        self.subtitle_label = QLabel()
+        self.subtitle_label.setWordWrap(True)
+        self.subtitle_label.setObjectName("muted")
+        set_font(self.subtitle_label, 10)
+        shell.addWidget(self.subtitle_label)
 
         timer_card = self.card()
         timer_layout = QVBoxLayout(timer_card)
@@ -322,16 +415,16 @@ class MainWindow(QMainWindow):
         controls.setAlignment(Qt.AlignCenter)
         timer_layout.addLayout(controls)
 
-        self.start_button = QPushButton("Старт")
+        self.start_button = QPushButton()
         self.start_button.setObjectName("primary")
         self.start_button.clicked.connect(self.toggle_running)
         controls.addWidget(self.start_button)
 
-        self.reset_button = QPushButton("Сброс")
+        self.reset_button = QPushButton()
         self.reset_button.clicked.connect(self.reset_timer)
         controls.addWidget(self.reset_button)
 
-        self.skip_button = QPushButton("Пропустить")
+        self.skip_button = QPushButton()
         self.skip_button.clicked.connect(self.skip_phase)
         controls.addWidget(self.skip_button)
 
@@ -342,37 +435,42 @@ class MainWindow(QMainWindow):
         settings_layout.setVerticalSpacing(12)
         shell.addWidget(settings_card)
 
-        settings_title = QLabel("Настройки")
-        set_font(settings_title, 13, QFont.DemiBold)
-        settings_layout.addWidget(settings_title, 0, 0, 1, 2)
+        self.settings_title = QLabel()
+        set_font(self.settings_title, 13, QFont.DemiBold)
+        settings_layout.addWidget(self.settings_title, 0, 0, 1, 2)
 
         self.focus_spin = self.spinbox(self.settings["focus_minutes"], 1, 180)
         self.break_spin = self.spinbox(self.settings["break_minutes"], 1, 60)
-        self.add_setting_row(settings_layout, 1, "Работа, минут", self.focus_spin)
-        self.add_setting_row(settings_layout, 2, "Перерыв, минут", self.break_spin)
+        self.language_combo = QComboBox()
+        self.language_combo.addItem("Русский", "ru")
+        self.language_combo.addItem("English", "en")
+        self.language_combo.setCurrentIndex(0 if self.language == "ru" else 1)
+        self.language_combo.currentIndexChanged.connect(self.on_language_changed)
 
-        self.sound_check = QCheckBox("Звуковой сигнал")
+        self.setting_labels = {}
+        self.add_setting_row(settings_layout, 1, "language", self.language_combo)
+        self.add_setting_row(settings_layout, 2, "focus_minutes", self.focus_spin)
+        self.add_setting_row(settings_layout, 3, "break_minutes", self.break_spin)
+
+        self.sound_check = QCheckBox()
         self.sound_check.setChecked(self.settings["sound"])
         self.sound_check.stateChanged.connect(self.persist_settings)
-        settings_layout.addWidget(self.sound_check, 3, 0, 1, 2)
+        settings_layout.addWidget(self.sound_check, 4, 0, 1, 2)
 
-        self.auto_check = QCheckBox("Автоматически начинать следующий фокус")
+        self.auto_check = QCheckBox()
         self.auto_check.setChecked(self.settings["auto_start_next_focus"])
         self.auto_check.stateChanged.connect(self.persist_settings)
-        settings_layout.addWidget(self.auto_check, 4, 0, 1, 2)
+        settings_layout.addWidget(self.auto_check, 5, 0, 1, 2)
 
         note = QFrame()
         note.setObjectName("note")
         note_layout = QVBoxLayout(note)
         note_layout.setContentsMargins(16, 14, 16, 14)
-        note_text = QLabel(
-            "Во время перерыва лучше встать, размять плечи и посмотреть вдаль. "
-            "Для 12-часового дня это не роскошь, а техобслуживание человека."
-        )
-        note_text.setWordWrap(True)
-        note_text.setObjectName("noteText")
-        set_font(note_text, 10)
-        note_layout.addWidget(note_text)
+        self.note_text = QLabel()
+        self.note_text.setWordWrap(True)
+        self.note_text.setObjectName("noteText")
+        set_font(self.note_text, 10)
+        note_layout.addWidget(self.note_text)
         shell.addWidget(note)
 
     def stylesheet(self):
@@ -433,6 +531,21 @@ class MainWindow(QMainWindow):
             min-width: 86px;
             font: 10pt "Segoe UI";
         }}
+        QComboBox {{
+            background: {COLORS["panel2"]};
+            color: {COLORS["text"]};
+            border: 1px solid {COLORS["line"]};
+            border-radius: 10px;
+            padding: 8px 10px;
+            min-width: 126px;
+            font: 10pt "Segoe UI";
+        }}
+        QComboBox QAbstractItemView {{
+            background: {COLORS["panel2"]};
+            color: {COLORS["text"]};
+            border: 1px solid {COLORS["line"]};
+            selection-background-color: #293241;
+        }}
         QCheckBox {{
             color: {COLORS["text"]};
             font: 10pt "Segoe UI";
@@ -463,12 +576,39 @@ class MainWindow(QMainWindow):
         spin.valueChanged.connect(self.on_duration_changed)
         return spin
 
-    def add_setting_row(self, layout, row, label, widget):
-        text = QLabel(label)
+    def add_setting_row(self, layout, row, key, widget):
+        text = QLabel()
         text.setObjectName("muted")
         set_font(text, 10)
+        self.setting_labels[key] = text
         layout.addWidget(text, row, 0)
         layout.addWidget(widget, row, 1, alignment=Qt.AlignRight)
+
+    def t(self, key, **kwargs):
+        return translate(self.language, key, **kwargs)
+
+    def apply_language(self):
+        self.setWindowTitle(self.t("window_title"))
+        self.title_label.setText(self.t("title"))
+        self.subtitle_label.setText(self.t("subtitle"))
+        self.settings_title.setText(self.t("settings"))
+        self.setting_labels["language"].setText(self.t("language"))
+        self.setting_labels["focus_minutes"].setText(self.t("focus_minutes"))
+        self.setting_labels["break_minutes"].setText(self.t("break_minutes"))
+        self.sound_check.setText(self.t("sound"))
+        self.auto_check.setText(self.t("auto_start"))
+        self.note_text.setText(self.t("note"))
+        self.reset_button.setText(self.t("reset"))
+        self.skip_button.setText(self.t("skip"))
+        self.refresh()
+
+    def on_language_changed(self, _index=None):
+        language = self.language_combo.currentData()
+        if language not in TRANSLATIONS or language == self.language:
+            return
+        self.language = language
+        self.persist_settings()
+        self.apply_language()
 
     def current_duration(self):
         return self.focus_seconds if self.state == "focus" else self.break_seconds
@@ -536,28 +676,28 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         duration = self.current_duration()
-        self.circle.set_state(self.remaining, duration, self.state)
+        self.circle.set_state(self.remaining, duration, self.state, self.language)
 
         if self.state == "focus":
-            self.status_label.setText("Фокус идет" if self.running else "Готов к фокусу")
-            self.phase_label.setText(f"Следующий перерыв: {self.break_spin.value()} минут")
+            self.status_label.setText(self.t("status_focus_running" if self.running else "status_focus_ready"))
+            self.phase_label.setText(self.t("phase_next_break", minutes=self.break_spin.value()))
         else:
-            self.status_label.setText("Перерыв" if self.running else "Перерыв на паузе")
-            self.phase_label.setText("Отдохни, посмотри вдаль, не проверяй уведомления")
+            self.status_label.setText(self.t("status_break_running" if self.running else "status_break_paused"))
+            self.phase_label.setText(self.t("phase_break"))
 
         if self.running:
-            self.start_button.setText("Пауза")
+            self.start_button.setText(self.t("pause"))
         else:
-            self.start_button.setText("Продолжить" if self.remaining < duration else "Старт")
+            self.start_button.setText(self.t("continue") if self.remaining < duration else self.t("start"))
 
         for overlay in self.overlays:
-            overlay.update_timer(self.remaining, self.break_seconds, self.break_spin.value())
+            overlay.update_timer(self.remaining, self.break_seconds, self.break_spin.value(), self.language)
 
     def show_overlays(self):
         self.hide_overlays()
         app = QApplication.instance()
         for screen in app.screens():
-            overlay = BreakOverlay(screen.geometry(), self.end_break_from_overlay, self.pause_timer)
+            overlay = BreakOverlay(screen.geometry(), self.end_break_from_overlay, self.pause_timer, self.language)
             overlay.showFullScreen()
             overlay.raise_()
             overlay.activateWindow()
@@ -585,6 +725,7 @@ class MainWindow(QMainWindow):
                 "break_minutes": self.break_spin.value(),
                 "sound": self.sound_check.isChecked(),
                 "auto_start_next_focus": self.auto_check.isChecked(),
+                "language": self.language,
             }
         )
 

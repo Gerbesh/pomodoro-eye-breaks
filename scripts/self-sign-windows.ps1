@@ -1,10 +1,10 @@
-$ErrorActionPreference = "Stop"
-
 param(
   [string]$FilePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) "release\FocusBreaks.exe"),
   [string]$Subject = "CN=Gerbesh Focus Breaks Self-Signed Code Signing",
   [string]$TimestampServer = "http://timestamp.digicert.com"
 )
+
+$ErrorActionPreference = "Stop"
 
 $Cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
   Where-Object { $_.Subject -eq $Subject } |
